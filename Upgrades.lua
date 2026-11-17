@@ -20,14 +20,20 @@ local BIG_UPGRADE = 100      -- Pawn's "no number" percent (an empty slot)
 local C_Item = C_Item
 local sformat, floor, debugprofilestop = string.format, math.floor, debugprofilestop
 
--- Module state in one table (upvalue limit).
+-- Module state in one table (upvalue limit). A drop is rated when a shown
+-- row or @upgrades asks for it, again after the gear, spec or scales change.
 local S = {
     ready = false,
     byItem = {},    -- itemID -> loot entry from EasyFind
     verdict = {},   -- itemID -> upgrade table, false when rated no upgrade
+    ratedGen = {},  -- itemID -> gen its verdict was rated in
+    gen = 1,        -- bumped when the gear, spec, scales or loot change
     queue = {}, head = 1,
-    pending = {},   -- itemID -> true, item data requested from the server
-    waitGear = false,
+    queued = {},
+    pending = {},   -- itemID -> "gear" or "drop", item data asked of the server
+    judged = {},    -- itemID -> true, asked for by @upgrades
+    settled = false,
+    upgradesDirty = false,
     inPawn = false, -- inside a Pawn call: its hooks are not our signal
 }
 
@@ -78,14 +84,14 @@ end
 local loader = CreateFrame("Frame")
 local rater = CreateFrame("Frame")
 rater:Hide()
-local Publish, Begin
+local Publish
 
 local function Cached(itemID)
     return not C_Item.IsItemDataCachedByID or C_Item.IsItemDataCachedByID(itemID)
 end
 
-local function RequestItem(itemID)
-    S.pending[itemID] = true
+local function RequestItem(itemID, kind)
+    S.pending[itemID] = kind
     if C_Item.RequestLoadItemDataByID then C_Item.RequestLoadItemDataByID(itemID) end
     loader:RegisterEvent("ITEM_DATA_LOAD_RESULT")
 end
@@ -96,66 +102,79 @@ local function GearCached()
     for slot = 1, 17 do
         local id = GetInventoryItemID("player", slot)
         if id and not Cached(id) then
-            RequestItem(id)
+            RequestItem(id, "gear")
             ok = false
         end
     end
     return ok
 end
 
+local function Settle(itemID, verdict)
+    S.verdict[itemID] = verdict
+    S.ratedGen[itemID] = S.gen
+    S.settled = true
+    if S.judged[itemID] then S.upgradesDirty = true end
+end
+
 local function Rate(itemID)
     local link = API.CallAction("loot", "link", itemID)
-    if not link then
-        S.verdict[itemID] = false
-        return
+    if not link then return Settle(itemID, false) end
+    if not Cached(itemID) then return RequestItem(itemID, "drop") end
+    Settle(itemID, Verdict(AskPawn(link), link))
+end
+
+-- A drop asked for: rated unless its verdict is of this gen; the old
+-- verdict shows meanwhile.
+local function Want(itemID)
+    if S.ratedGen[itemID] == S.gen or S.pending[itemID] then return end
+    if not S.queued[itemID] then
+        S.queued[itemID] = true
+        S.queue[#S.queue + 1] = itemID
     end
-    if not Cached(itemID) then return RequestItem(itemID) end
-    S.verdict[itemID] = Verdict(AskPawn(link), link)
+    rater:Show()
 end
 
 rater:SetScript("OnUpdate", function(self)
+    if not (PawnIsReady() and GearCached()) then return self:Hide() end
     local stop = debugprofilestop() + RATE_BUDGET_MS
     while S.head <= #S.queue do
-        Rate(S.queue[S.head])
+        local itemID = S.queue[S.head]
         S.head = S.head + 1
+        S.queued[itemID] = nil
+        Rate(itemID)
         if debugprofilestop() > stop then return end
     end
     self:Hide()
     S.queue, S.head = {}, 1
-    Publish()
+    if S.settled then
+        S.settled = false
+        Publish()
+    end
 end)
 
-local function Enqueue(itemID)
-    S.queue[#S.queue + 1] = itemID
-    rater:Show()
-end
-
--- Items the server sent: rated now; worn gear complete: the run starts.
+-- Items the server sent: a drop asked for again, worn gear lets the queue run.
 loader:SetScript("OnEvent", function(self, _, itemID, ok)
-    if not S.pending[itemID] then return end
+    local kind = S.pending[itemID]
+    if not kind then return end
     S.pending[itemID] = nil
     if next(S.pending) == nil then self:UnregisterEvent("ITEM_DATA_LOAD_RESULT") end
-    if S.waitGear then
-        if next(S.pending) == nil then Begin() end
-        return
+    if kind == "gear" then
+        if S.head <= #S.queue then rater:Show() end
+    elseif ok and S.byItem[itemID] then
+        Want(itemID)
+    else
+        Settle(itemID, false)
     end
-    if ok and S.byItem[itemID] then Enqueue(itemID) else S.verdict[itemID] = false end
 end)
 
--- Rates every known drop again; verdicts stay until replaced.
-function Begin()
-    if not (S.ready and PawnIsReady()) then return end
-    if not GearCached() then
-        S.waitGear = true
-        return
-    end
-    S.waitGear = false
-    S.queue, S.head = {}, 1
-    for itemID in pairs(S.byItem) do S.queue[#S.queue + 1] = itemID end
-    if #S.queue > 0 then rater:Show() end
+-- Every verdict stale: shown rows and @upgrades ask again.
+local function Stale()
+    S.gen = S.gen + 1
+    if next(S.judged) then S.upgradesDirty = true end
+    Publish()
 end
 
--- EasyFind's loot changed: new entry list, rated from scratch.
+-- EasyFind's loot changed: new entry list, every verdict stale.
 local function Reload()
     if not S.ready then return end
     local list = API.CallAction("loot", "entries")
@@ -166,9 +185,9 @@ local function Reload()
         if e.itemID then S.byItem[e.itemID] = e end
     end
     for itemID in pairs(S.verdict) do
-        if not S.byItem[itemID] then S.verdict[itemID] = nil end
+        if not S.byItem[itemID] then S.verdict[itemID], S.ratedGen[itemID] = nil, nil end
     end
-    Begin()
+    Stale()
 end
 
 local refreshPending = false
@@ -177,8 +196,15 @@ local function Refresh()
     refreshPending = true
     C_Timer.After(REFRESH_DELAY, function()
         refreshPending = false
-        Begin()
+        Stale()
     end)
+end
+
+-- A drop EasyFind lists, rated on first sight.
+local function Asked(itemID)
+    if not (S.ready and itemID and S.byItem[itemID]) then return false end
+    Want(itemID)
+    return true
 end
 
 -- ==== EasyFind's rows =======================================================
@@ -187,13 +213,16 @@ local function Percent(pct)
     return floor(pct * 100 + 0.5)
 end
 
+-- Rows paint again; @upgrades is built again only when its drops changed.
 local publishPending = false
 function Publish()
     if publishPending then return end
     publishPending = true
-    C_Timer.After(0.2, function()
+    C_Timer.After(0, function()
         publishPending = false
-        if API.RefreshUpgrades then API.RefreshUpgrades() end
+        local upgrades = S.upgradesDirty
+        S.upgradesDirty = false
+        if upgrades and API.RefreshUpgrades then API.RefreshUpgrades() end
         if API.RefreshRowDecorations then API.RefreshRowDecorations() end
     end)
 end
@@ -235,17 +264,11 @@ local function Menu(row)
     return rows
 end
 
-local function Rated()
-    local ids = {}
-    for itemID, v in pairs(S.verdict) do
-        if v then ids[itemID] = true end
-    end
-    return { itemID = ids }
-end
-
 -- Pawn's word for @upgrades: the percent, true with no number, false for
 -- no upgrade, nil while unrated (EasyFind's own comparison stands).
 local function Judge(itemID)
+    if not Asked(itemID) then return nil end
+    S.judged[itemID] = true
     local v = S.verdict[itemID]
     if v == nil then return nil end
     if v == false then return false end
@@ -266,8 +289,7 @@ API.RegisterExtension({
 if API.RegisterRowDecorator then
     API.RegisterRowDecorator({
         id = KEY, label = L["EXT_NAME"],
-        candidates = Rated,
-        applies = function(row) return S.ready and S.verdict[row.itemID] and true or false end,
+        applies = function(row) return Asked(row.itemID) and S.verdict[row.itemID] and true or false end,
         subtext = Mark,
         tooltip = Lines,
         menu = Menu,
