@@ -281,6 +281,8 @@ API.RegisterExtension({
     name = L["EXT_NAME"],
     description = L["EXT_DESC"],
     icon = ICON,
+    -- The tile opens @upgrades, judged by Pawn.
+    scope = "upgrades",
 })
 
 if API.RegisterRowDecorator then
