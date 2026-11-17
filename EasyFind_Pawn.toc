@@ -2,7 +2,8 @@
 ## Title: EasyFind [Pawn]
 ## Notes: Search any item and see its Pawn upgrade value: how much better it is for you and for which scale, with EasyFind's upgrades ranked by Pawn. Requires Pawn.
 ## Author: justawower
-## Version: 0.1.0
+## Version: 1.0.0
+## X-Curse-Project-ID: 1811898
 ## IconTexture: Interface\AddOns\EasyFind\textures\SpyglassMinimap
 ## Group: EasyFind
 ## Category: UI

@@ -6,7 +6,7 @@ local L = setmetatable({}, { __index = function(_, k) return k end })
 ns.L = L
 
 L["EXT_NAME"] = "Pawn"
-L["EXT_DESC"] = "Pawn's verdict on the items EasyFind finds, and EasyFind's upgrades judged by Pawn."
+L["EXT_DESC"] = "Any item's Pawn upgrade value in EasyFind, with its upgrades ranked by Pawn."
 
 L["MARK_FMT"] = "+%d%% %s"
 L["MARK_BIG_FMT"] = "Upgrade for %s"
