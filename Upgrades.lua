@@ -205,19 +205,19 @@ local function Wanted(e, db)
     return db.dungeons ~= false
 end
 
+-- Outside @upgrades only these words find a row: EasyFind's own loot row,
+-- which the decorator below marks, is the one a name or a boss finds.
 local function Rows()
     if not S.ready then return {} end
     local db = DB()
+    local scoped = (API.MINOR or 0) >= 7 or nil
     local out = {}
     for itemID, v in pairs(S.verdict) do
         local e = v and S.byItem[itemID]
         if e and Wanted(e, db) then
-            local words = {}
-            for _, w in ipairs({ e.bossName, e.instanceName, e.slotName, v.scaleName }) do
-                if type(w) == "string" and w ~= "" then words[#words + 1] = w end
-            end
             out[#out + 1] = { name = e.name, icon = e.icon, itemID = itemID, pct = v.pct,
-                              searchCommandDesc = Subtext(e, v), keywords = words }
+                              searchCommandDesc = Subtext(e, v), scopedName = scoped,
+                              keywords = { "upgrade", "upgrades", v.scaleName } }
         end
     end
     -- The biggest upgrade leads; ties by name.
@@ -240,6 +240,7 @@ function Publish()
         end
         API.SetBadge(KEY, n)
         API.RefreshSearchProvider(KEY)
+        if API.RefreshRowDecorations then API.RefreshRowDecorations() end
     end)
 end
 
@@ -350,6 +351,37 @@ API.RegisterSearchProvider({
     hint = Hint,
     menu = Menu,
 })
+
+-- EasyFind's own rows for a rated drop (its loot row, the item in a bag)
+-- carry the verdict: the subtext's percent and scale, Pawn's menu entries.
+local function Mark(row)
+    local v = S.verdict[row.itemID]
+    if v.pct >= BIG_UPGRADE then return sformat(L["MARK_BIG_FMT"], v.scaleName) end
+    return sformat(L["MARK_FMT"], Percent(v.pct), v.scaleName)
+end
+
+local function Rated()
+    local ids = {}
+    for itemID, v in pairs(S.verdict) do
+        if v then ids[itemID] = true end
+    end
+    return { itemID = ids }
+end
+
+if API.RegisterRowDecorator then
+    API.RegisterRowDecorator({
+        id = KEY .. "-mark", extension = KEY, label = L["EXT_NAME"],
+        candidates = Rated,
+        -- Never the extension's own rows (they carry pct).
+        applies = function(row)
+            if not S.ready or row.pct ~= nil or not S.verdict[row.itemID] then return false end
+            local e = S.byItem[row.itemID]
+            return e ~= nil and Wanted(e, DB())
+        end,
+        subtext = Mark,
+        menu = Menu,
+    })
+end
 
 local events = CreateFrame("Frame")
 events:RegisterEvent("PLAYER_ENTERING_WORLD")

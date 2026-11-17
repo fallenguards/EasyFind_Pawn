@@ -18,6 +18,8 @@ L["OPT_RAIDS_TIP"] = "Drops from raid bosses."
 
 L["SUBTEXT_FMT"] = "+%d%% %s, from %s in %s"
 L["SUBTEXT_BIG_FMT"] = "Upgrade for %s, from %s in %s"
+L["MARK_FMT"] = "+%d%% %s"
+L["MARK_BIG_FMT"] = "Upgrade for %s"
 L["FROM_FMT"] = "From %s in %s"
 L["REPLACES_FMT"] = "Replaces %s"
 L["ALSO_FMT"] = "Also +%d%% for %s"
