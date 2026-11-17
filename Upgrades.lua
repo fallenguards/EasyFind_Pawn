@@ -9,9 +9,7 @@ if not (API and API.VERSION == 1) then return end
 
 local L = ns.L
 local KEY = "pawn"
--- EasyFind's own loot glyph, so the marks read as one feature.
-local ICON = "Interface\\AddOns\\EasyFind\\textures\\art\\loot"
-local ICON_COORDS = { 0, 0.75, 0, 0.67188 }
+local ICON = "Interface\\AddOns\\EasyFind_Pawn\\upgrade"
 local RATE_BUDGET_MS = 4     -- rating time per frame
 local REFRESH_DELAY = 1      -- seconds after a gear or scale change
 local FIRST_LOAD_DELAY = 10  -- seconds after entering the world
@@ -283,7 +281,6 @@ API.RegisterExtension({
     name = L["EXT_NAME"],
     description = L["EXT_DESC"],
     icon = ICON,
-    iconCoords = ICON_COORDS,
 })
 
 if API.RegisterRowDecorator then
