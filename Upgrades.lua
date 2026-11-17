@@ -114,10 +114,17 @@ local function Settle(itemID, verdict)
     if S.judged[itemID] then S.upgradesDirty = true end
 end
 
+-- Something worn: any item with a gear slot, read with no wait on the cache.
+local function Wearable(itemID)
+    local equipLoc = select(4, C_Item.GetItemInfoInstant(itemID))
+    return equipLoc ~= nil and equipLoc ~= "" and equipLoc ~= "INVTYPE_NON_EQUIP_IGNORE"
+end
+
+-- A boss drop by EasyFind's loot link, any other gear by its own.
 local function Rate(itemID)
-    local link = API.CallAction("loot", "link", itemID)
-    if not link then return Settle(itemID, false) end
     if not Cached(itemID) then return RequestItem(itemID, "drop") end
+    local link = S.byItem[itemID] and API.CallAction("loot", "link", itemID) or select(2, C_Item.GetItemInfo(itemID))
+    if not link then return Settle(itemID, false) end
     Settle(itemID, Verdict(AskPawn(link), link))
 end
 
@@ -158,7 +165,7 @@ loader:SetScript("OnEvent", function(self, _, itemID, ok)
     if next(S.pending) == nil then self:UnregisterEvent("ITEM_DATA_LOAD_RESULT") end
     if kind == "gear" then
         if S.head <= #S.queue then rater:Show() end
-    elseif ok and S.byItem[itemID] then
+    elseif ok and (S.byItem[itemID] or Wearable(itemID)) then
         Want(itemID)
     else
         Settle(itemID, false)
@@ -183,7 +190,7 @@ local function Reload()
         if e.itemID then S.byItem[e.itemID] = e end
     end
     for itemID in pairs(S.verdict) do
-        if not S.byItem[itemID] then S.verdict[itemID], S.ratedGen[itemID] = nil, nil end
+        if not (S.byItem[itemID] or Wearable(itemID)) then S.verdict[itemID], S.ratedGen[itemID] = nil, nil end
     end
     Stale()
 end
@@ -198,9 +205,9 @@ local function Refresh()
     end)
 end
 
--- A drop EasyFind lists, rated on first sight.
+-- Any gear on a row, a boss drop or not, rated on first sight.
 local function Asked(itemID)
-    if not (S.ready and itemID and S.byItem[itemID]) then return false end
+    if not (S.ready and itemID and (S.byItem[itemID] or Wearable(itemID))) then return false end
     Want(itemID)
     return true
 end
