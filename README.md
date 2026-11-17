@@ -1,6 +1,6 @@
 # EasyFind: Pawn Extension
 
-Pawn's verdict on the items EasyFind finds. A boss drop, a bag item or an upgrade row that Pawn rates above what you wear says how much better it is and for which scale, right on EasyFind's own row. Hover the row for what the item replaces and the other scales it helps; right-click it to compare the item in Pawn.
+Search any item in the game and see at once what Pawn thinks of it. Gear Pawn rates above what you wear says how much better it is and for which scale, right on EasyFind's row: a boss drop, something in your bags, a crafted piece or a vendor's. Hover the row for what the item replaces and the other scales it helps; right-click it to compare the item in Pawn.
 
 With Pawn installed, EasyFind's `@upgrades` is judged by Pawn: under each gear slot, the drops Pawn rates as upgrades for the character you play, biggest first.
 
@@ -8,7 +8,7 @@ Requires Pawn and EasyFind.
 
 ## What it adds
 
-- On EasyFind's item rows: the percent and the scale after the row's text, what the item replaces in the tooltip, and Compare in Pawn and Open Pawn on the right-click menu.
+- On every gear row EasyFind shows: the percent and the scale after the row's text, what the item replaces in the tooltip, and Compare in Pawn and Open Pawn on the right-click menu.
 - `@upgrades` judged by Pawn's scales for the character you play. Other characters' pages keep EasyFind's own comparison.
 
 ## Dependencies

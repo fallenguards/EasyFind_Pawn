@@ -1,6 +1,6 @@
 ## Interface: 120105, 16001
 ## Title: EasyFind [Pawn]
-## Notes: Pawn's verdict on the items EasyFind finds: how much better a drop is for you and for which scale, and EasyFind's upgrades judged by Pawn. Requires Pawn.
+## Notes: Search any item and see its Pawn upgrade value: how much better it is for you and for which scale, with EasyFind's upgrades ranked by Pawn. Requires Pawn.
 ## Author: justawower
 ## Version: 0.1.0
 ## IconTexture: Interface\AddOns\EasyFind\textures\SpyglassMinimap
