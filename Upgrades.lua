@@ -1,14 +1,15 @@
--- Pawn's verdicts on EasyFind's boss loot: the drops Pawn rates above what
--- this character wears, each with its boss and instance, a click going
--- where EasyFind's own loot row goes. Pawn is only read: its functions are
--- called at runtime, its scales and settings never written or copied.
+-- Pawn's verdicts on EasyFind's rows: a drop EasyFind lists (its loot
+-- rows, @upgrades, a bag item) says how much better Pawn rates it and for
+-- which scale, with Pawn's compare on its menu; @upgrades is judged by
+-- Pawn. Pawn is only read: its functions are called at runtime, its
+-- scales and settings never written or copied.
 local _, ns = ...
 local API = EasyFind and EasyFind.API
 if not (API and API.VERSION == 1) then return end
 
 local L = ns.L
 local KEY = "pawn"
--- EasyFind's own loot glyph, so the rows read as one feature.
+-- EasyFind's own loot glyph, so the marks read as one feature.
 local ICON = "Interface\\AddOns\\EasyFind\\textures\\art\\loot"
 local ICON_COORDS = { 0, 0.75, 0, 0.67188 }
 local RATE_BUDGET_MS = 4     -- rating time per frame
@@ -17,7 +18,6 @@ local FIRST_LOAD_DELAY = 10  -- seconds after entering the world
 local BIG_UPGRADE = 100      -- Pawn's "no number" percent (an empty slot)
 
 local C_Item = C_Item
-local IsShiftKeyDown, IsControlKeyDown = IsShiftKeyDown, IsControlKeyDown
 local sformat, floor, debugprofilestop = string.format, math.floor, debugprofilestop
 
 -- Module state in one table (upvalue limit).
@@ -30,11 +30,6 @@ local S = {
     waitGear = false,
     inPawn = false, -- inside a Pawn call: its hooks are not our signal
 }
-
-local function DB()
-    EasyFindPawnDB = EasyFindPawnDB or {}
-    return EasyFindPawnDB
-end
 
 local function Print(text)
     print(sformat("|cff66ccff%s:|r %s", L["EXT_NAME"], text))
@@ -52,11 +47,10 @@ local function BindPawn()
 end
 
 local function BindLoot()
-    return API.HasAction("loot", "ensure") and API.HasAction("loot", "entries")
-        and API.HasAction("loot", "link") and API.HasAction("loot", "open")
+    return API.HasAction("loot", "ensure") and API.HasAction("loot", "entries") and API.HasAction("loot", "link")
 end
 
--- Pawn's upgrade list, sorted by scale name; the row shows the biggest.
+-- Pawn's upgrade list, sorted by scale name; the mark shows the biggest.
 local function Verdict(info, link)
     if type(info) ~= "table" or not info[1] then return false end
     local best = info[1]
@@ -187,45 +181,10 @@ local function Refresh()
     end)
 end
 
--- ==== rows ==================================================================
+-- ==== EasyFind's rows =======================================================
 
 local function Percent(pct)
     return floor(pct * 100 + 0.5)
-end
-
-local function Subtext(e, v)
-    if v.pct >= BIG_UPGRADE then
-        return sformat(L["SUBTEXT_BIG_FMT"], v.scaleName, e.bossName or "", e.instanceName or "")
-    end
-    return sformat(L["SUBTEXT_FMT"], Percent(v.pct), v.scaleName, e.bossName or "", e.instanceName or "")
-end
-
-local function Wanted(e, db)
-    if e.isRaid then return db.raids ~= false end
-    return db.dungeons ~= false
-end
-
--- Outside @upgrades only these words find a row: EasyFind's own loot row,
--- which the decorator below marks, is the one a name or a boss finds.
-local function Rows()
-    if not S.ready then return {} end
-    local db = DB()
-    local scoped = (API.MINOR or 0) >= 7 or nil
-    local out = {}
-    for itemID, v in pairs(S.verdict) do
-        local e = v and S.byItem[itemID]
-        if e and Wanted(e, db) then
-            out[#out + 1] = { name = e.name, icon = e.icon, itemID = itemID, pct = v.pct,
-                              searchCommandDesc = Subtext(e, v), scopedName = scoped,
-                              keywords = { "upgrade", "upgrades", v.scaleName } }
-        end
-    end
-    -- The biggest upgrade leads; ties by name.
-    table.sort(out, function(a, b)
-        if a.pct ~= b.pct then return a.pct > b.pct end
-        return a.name < b.name
-    end)
-    return out
 end
 
 local publishPending = false
@@ -234,130 +193,46 @@ function Publish()
     publishPending = true
     C_Timer.After(0.2, function()
         publishPending = false
-        local n = 0
-        for itemID, v in pairs(S.verdict) do
-            if v and S.byItem[itemID] and Wanted(S.byItem[itemID], DB()) then n = n + 1 end
-        end
-        API.SetBadge(KEY, n)
-        API.RefreshSearchProvider(KEY)
+        if API.RefreshUpgrades then API.RefreshUpgrades() end
         if API.RefreshRowDecorations then API.RefreshRowDecorations() end
     end)
 end
 
-local function HasJournal()
-    return type(EJ_GetNumTiers) == "function" and (EJ_GetNumTiers() or 0) > 0
-end
-
-local function Hint()
-    if not S.ready then return nil end
-    return { click = HasJournal() and L["HINT_JOURNAL"] or L["HINT_DIRECTIONS"],
-             ctrl = L["HINT_DRESS"], shift = L["HINT_LINK"] }
-end
-
-local function Link(row)
+-- After the row's subtext: the percent and the scale; on @upgrades, whose
+-- rows show the percent already, the scale alone.
+local function Mark(row)
     local v = S.verdict[row.itemID]
-    return v and v.link or nil
+    if v.pct >= BIG_UPGRADE then return sformat(L["MARK_BIG_FMT"], v.scaleName) end
+    if row.upgradeSlot then return v.scaleName end
+    return sformat(L["MARK_FMT"], Percent(v.pct), v.scaleName)
 end
 
--- Shift links the item in chat, Ctrl tries it on; a plain click goes
--- where EasyFind's own loot row goes.
-local function Select(row)
-    if not S.ready then return end
-    local link = Link(row)
-    if IsShiftKeyDown() and link then return ChatEdit_InsertLink(link) end
-    if IsControlKeyDown() and link then return DressUpItemLink(link) end
-    API.CallAction("loot", "open", row.itemID)
-end
-
-local function Tooltip(row, tt)
-    local v = S.ready and S.verdict[row.itemID]
-    local e = v and S.byItem[row.itemID]
-    if not e then return false end
-    tt:SetHyperlink(v.link)
-    tt:AddLine(" ")
-    tt:AddLine(sformat(L["FROM_FMT"], e.bossName or "", e.instanceName or ""), 1, 1, 1)
+-- Under the row's tooltip: what the drop replaces, the other scales it helps.
+local function Lines(row, _, tt)
+    local v = S.verdict[row.itemID]
     if v.existing then tt:AddLine(sformat(L["REPLACES_FMT"], v.existing), 1, 1, 1) end
     for i = 1, #v.others do
         local o = v.others[i]
         if (o.PercentUpgrade or 0) < BIG_UPGRADE then
-            tt:AddLine(sformat(L["ALSO_FMT"], Percent(o.PercentUpgrade or 0), o.LocalizedScaleName or o.ScaleName or ""), 0.8, 0.8, 0.8)
+            tt:AddLine(sformat(L["ALSO_FMT"], Percent(o.PercentUpgrade or 0), o.LocalizedScaleName or o.ScaleName or ""),
+                0.8, 0.8, 0.8)
         end
     end
-    return true
 end
 
 local function Menu(row)
-    local link = S.ready and Link(row)
+    local v = S.verdict[row.itemID]
+    local link = v and v.link
     if not link then return nil end
     local rows = {}
     if type(PawnUI_SetCompareItemAndShow) == "function" then
-        rows[#rows + 1] = { kind = "action", label = L["MENU_COMPARE"], onClick = function() PawnUI_SetCompareItemAndShow(2, link) end }
+        rows[#rows + 1] = { kind = "action", label = L["MENU_COMPARE"],
+                            onClick = function() PawnUI_SetCompareItemAndShow(2, link) end }
     end
     if type(PawnUIShow) == "function" then
         rows[#rows + 1] = { kind = "action", label = L["MENU_PAWN"], onClick = PawnUIShow }
     end
     return rows
-end
-
--- ==== registration ==========================================================
-
-local function Option(key, label, tip)
-    return {
-        label = label, tooltip = tip,
-        get = function() return DB()[key] ~= false end,
-        set = function(on)
-            if on then DB()[key] = nil else DB()[key] = false end
-            Publish()
-        end,
-    }
-end
-
-local function FilterOptions()
-    return { Option("dungeons", L["OPT_DUNGEONS"], L["OPT_DUNGEONS_TIP"]),
-             Option("raids", L["OPT_RAIDS"], L["OPT_RAIDS_TIP"]) }
-end
-
-API.RegisterExtension({
-    id = KEY,
-    name = L["EXT_NAME"],
-    description = L["EXT_DESC"],
-    icon = ICON,
-    iconCoords = ICON_COORDS,
-    keywords = { "upgrade", "upgrades", "pawn", "gear" },
-    scope = KEY,
-    settings = function(page, kit)
-        local below = kit.Title(page, L["EXT_NAME"], L["SETTINGS_HINT"])
-        local opts = FilterOptions()
-        for i = 1, #opts do
-            local box = kit.Checkbox(page, opts[i].label, opts[i].get, opts[i].set, opts[i].tooltip)
-            box:SetPoint("TOPLEFT", below, "BOTTOMLEFT", 0, i == 1 and -8 or -4)
-            below = box
-        end
-    end,
-})
-
-API.RegisterSearchProvider({
-    key = KEY,
-    label = L["PROVIDER_LABEL"],
-    category = L["CATEGORY"],
-    extension = KEY,
-    words = { "upgrade", "upgrades", "pawn" },
-    aliases = { "upgrades", "upgrade", "pawn" },
-    lazy = true,
-    options = FilterOptions(),
-    rows = Rows,
-    select = Select,
-    tooltip = Tooltip,
-    hint = Hint,
-    menu = Menu,
-})
-
--- EasyFind's own rows for a rated drop (its loot row, the item in a bag)
--- carry the verdict: the subtext's percent and scale, Pawn's menu entries.
-local function Mark(row)
-    local v = S.verdict[row.itemID]
-    if v.pct >= BIG_UPGRADE then return sformat(L["MARK_BIG_FMT"], v.scaleName) end
-    return sformat(L["MARK_FMT"], Percent(v.pct), v.scaleName)
 end
 
 local function Rated()
@@ -368,17 +243,33 @@ local function Rated()
     return { itemID = ids }
 end
 
+-- Pawn's word for @upgrades: the percent, true with no number, false for
+-- no upgrade, nil while unrated (EasyFind's own comparison stands).
+local function Judge(itemID)
+    local v = S.verdict[itemID]
+    if v == nil then return nil end
+    if v == false then return false end
+    if v.pct >= BIG_UPGRADE then return true end
+    return Percent(v.pct)
+end
+
+-- ==== registration ==========================================================
+
+API.RegisterExtension({
+    id = KEY,
+    name = L["EXT_NAME"],
+    description = L["EXT_DESC"],
+    icon = ICON,
+    iconCoords = ICON_COORDS,
+})
+
 if API.RegisterRowDecorator then
     API.RegisterRowDecorator({
-        id = KEY .. "-mark", extension = KEY, label = L["EXT_NAME"],
+        id = KEY, label = L["EXT_NAME"],
         candidates = Rated,
-        -- Never the extension's own rows (they carry pct).
-        applies = function(row)
-            if not S.ready or row.pct ~= nil or not S.verdict[row.itemID] then return false end
-            local e = S.byItem[row.itemID]
-            return e ~= nil and Wanted(e, DB())
-        end,
+        applies = function(row) return S.ready and S.verdict[row.itemID] and true or false end,
         subtext = Mark,
+        tooltip = Lines,
         menu = Menu,
     })
 end
@@ -397,6 +288,7 @@ events:SetScript("OnEvent", function(self, event, unit)
         -- one of these two calls, as does its own spec switch.
         hooksecurefunc("PawnInvalidateBestItems", Refresh)
         hooksecurefunc("PawnResetTooltips", Refresh)
+        if API.RegisterUpgradeJudge then API.RegisterUpgradeJudge({ extension = KEY, rate = Judge }) end
         API.On("loot", "changed", Reload)
         -- The loot list loads after the login settles, not during it.
         C_Timer.After(FIRST_LOAD_DELAY, function() API.CallAction("loot", "ensure", Reload) end)

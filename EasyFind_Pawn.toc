@@ -1,13 +1,12 @@
 ## Interface: 120105, 16001
 ## Title: EasyFind [Pawn]
-## Notes: The boss drops Pawn rates as upgrades for you, in EasyFind's search bar: type upgrades, click one for the way there. Requires Pawn.
+## Notes: Pawn's verdict on the items EasyFind finds: how much better a drop is for you and for which scale, and EasyFind's upgrades judged by Pawn. Requires Pawn.
 ## Author: justawower
 ## Version: 0.1.0
 ## IconTexture: Interface\AddOns\EasyFind\textures\SpyglassMinimap
 ## Group: EasyFind
 ## Category: UI
 ## Dependencies: EasyFind, Pawn
-## SavedVariables: EasyFindPawnDB
 ## DefaultState: enabled
 
 Locales/enUS.lua

@@ -2,8 +2,5 @@
 
 ## 0.1.0 (unreleased)
 
-- Upgrade search: the boss drops Pawn rates as upgrades for you, found by typing upgrades in EasyFind, each row with the percent, the scale, the boss and the instance.
-- Click: the Adventure Guide at the drop, or directions to the instance on WoW Forever. Ctrl-click tries it on, Shift-click links it in chat.
-- Right-click: compare the drop in Pawn, open Pawn.
-- Scope: `@upgrades` lists every upgrade, biggest first.
-- Filter toggles: Dungeons, Raids.
+- Pawn's verdict on EasyFind's rows: a boss drop, a bag item or an upgrade row Pawn rates above what you wear shows the percent and the scale after its text; hover for what it replaces and the other scales it helps; right-click to compare it in Pawn or open Pawn.
+- `@upgrades` judged by Pawn: under each gear slot, the drops Pawn rates as upgrades for the character you play, biggest first.
