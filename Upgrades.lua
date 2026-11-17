@@ -6,6 +6,8 @@
 local _, ns = ...
 local API = EasyFind and EasyFind.API
 if not (API and API.VERSION == 1) then return end
+local IsAddOnLoaded = C_AddOns and C_AddOns.IsAddOnLoaded or IsAddOnLoaded
+if not (IsAddOnLoaded and IsAddOnLoaded("Pawn")) then return end
 
 local L = ns.L
 local KEY = "pawn"

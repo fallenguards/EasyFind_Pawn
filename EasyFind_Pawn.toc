@@ -6,7 +6,8 @@
 ## IconTexture: Interface\AddOns\EasyFind\textures\SpyglassMinimap
 ## Group: EasyFind
 ## Category: UI
-## Dependencies: EasyFind, Pawn
+## Dependencies: EasyFind
+## OptionalDeps: Pawn
 ## DefaultState: enabled
 
 Locales/enUS.lua
