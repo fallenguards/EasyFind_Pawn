@@ -1,4 +1,4 @@
-## Interface: 120105, 16001
+## Interface: 120107, 120105, 16001
 ## Title: EasyFind [Pawn]
 ## Notes: Search any item and see its Pawn upgrade value: how much better it is for you and for which scale, with EasyFind's upgrades ranked by Pawn. Requires Pawn.
 ## Author: justawower
